@@ -502,6 +502,61 @@ app.post("/api/meta/embedded-signup/exchange-code", requireAdmin, async (req, re
   }
 });
 
+
+app.get("/privacy-policy", (_req, res) => {
+  res.setHeader("Content-Type", "text/html");
+
+  res.send(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Privacy Policy - IDC WhatsApp Meta Admin</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; line-height: 1.6;">
+        <h1>Privacy Policy</h1>
+
+        <p><strong>Last updated:</strong> 21 May 2026</p>
+
+        <p>
+          IDC WhatsApp Meta Admin is used by International Dental Centre Pte. Ltd.
+          to connect WhatsApp Business messaging with our internal customer support and appointment enquiry systems.
+        </p>
+
+        <h2>Information we collect</h2>
+        <p>
+          We may process WhatsApp profile information, phone numbers, message content,
+          message status updates, and appointment or dental enquiry details shared by users.
+        </p>
+
+        <h2>How we use information</h2>
+        <p>
+          We use this information to respond to dental inquiries, appointment requests,
+          clinic-related questions, and customer support messages.
+        </p>
+
+        <h2>Data sharing</h2>
+        <p>
+          We do not sell user data. Data may be shared only with authorised clinic staff,
+          service providers, or platforms required to operate WhatsApp Business messaging.
+        </p>
+
+        <h2>Data retention</h2>
+        <p>
+          We retain message and support records only as needed for clinic operations,
+          compliance, support, and service quality.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+          For privacy-related requests, contact us at admin@idcsg.com.
+        </p>
+      </body>
+    </html>
+  `);
+});
+
+
 /**
  * Check saved connection.
  */
