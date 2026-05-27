@@ -24,8 +24,15 @@ const META_APP_SECRET = process.env.META_APP_SECRET;
 const META_CONFIG_ID = process.env.META_CONFIG_ID;
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || "v25.0";
 
+// For WhatsApp Business App coexistence onboarding
+const META_FEATURE_TYPE =
+  process.env.META_FEATURE_TYPE || "whatsapp_business_app_onboarding";
+
 const ADMIN_SETUP_KEY = process.env.ADMIN_SETUP_KEY;
 const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
+
+const PUBLIC_BASE_URL =
+  process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
 
 const SHOW_TOKEN_IN_ADMIN = process.env.SHOW_TOKEN_IN_ADMIN === "true";
 
@@ -57,7 +64,7 @@ function requireAdmin(req, res, next) {
   if (!ADMIN_SETUP_KEY) {
     return res.status(500).json({
       ok: false,
-      error: "ADMIN_SETUP_KEY is not configured in .env",
+      error: "ADMIN_SETUP_KEY is not configured in env",
     });
   }
 
@@ -87,25 +94,34 @@ function extractEmbeddedSignupIds(embeddedSignupData = {}) {
     embeddedSignupData ||
     {};
 
+  const phoneNumberId =
+    data.phone_number_id ||
+    data.phoneNumberId ||
+    data.business_phone_number_id ||
+    data.businessPhoneNumberId ||
+    data.phone_number?.id ||
+    data.phoneNumber?.id ||
+    null;
+
+  const wabaId =
+    data.waba_id ||
+    data.wabaId ||
+    data.whatsapp_business_account_id ||
+    data.whatsappBusinessAccountId ||
+    data.waba?.id ||
+    data.whatsapp_business_account?.id ||
+    null;
+
+  const businessId =
+    data.business_id ||
+    data.businessId ||
+    data.business?.id ||
+    null;
+
   return {
-    wabaId:
-      data.waba_id ||
-      data.wabaId ||
-      data.whatsapp_business_account_id ||
-      data.whatsappBusinessAccountId ||
-      null,
-
-    phoneNumberId:
-      data.phone_number_id ||
-      data.phoneNumberId ||
-      data.business_phone_number_id ||
-      data.businessPhoneNumberId ||
-      null,
-
-    businessId:
-      data.business_id ||
-      data.businessId ||
-      null,
+    wabaId,
+    phoneNumberId,
+    businessId,
   };
 }
 
@@ -124,16 +140,31 @@ function readConnection() {
 }
 
 app.get("/", (_req, res) => {
+  res.setHeader("Content-Type", "text/html");
+
   res.send(`
-    <pre>
-WhatsApp Meta Admin backend is running.
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>WhatsApp Meta Admin</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; line-height: 1.6;">
+        <h1>WhatsApp Meta Admin backend is running</h1>
 
-Open:
-GET /whatsapp-connect?key=YOUR_ADMIN_SETUP_KEY
+        <p>Open admin page:</p>
+        <pre>GET /whatsapp-connect?key=YOUR_ADMIN_SETUP_KEY</pre>
 
-Webhook:
-GET/POST /webhook
-    </pre>
+        <p>Webhook:</p>
+        <pre>GET/POST /webhook</pre>
+
+        <p>Privacy policy:</p>
+        <pre>GET /privacy-policy</pre>
+
+        <p>Data deletion:</p>
+        <pre>POST /data-deletion</pre>
+      </body>
+    </html>
   `);
 });
 
@@ -148,6 +179,7 @@ app.get("/whatsapp-connect", requireAdmin, (req, res) => {
     configId: META_CONFIG_ID,
     graphApiVersion: GRAPH_API_VERSION,
     adminKey,
+    featureType: META_FEATURE_TYPE,
   };
 
   res.setHeader("Content-Type", "text/html");
@@ -227,7 +259,11 @@ app.get("/whatsapp-connect", requireAdmin, (req, res) => {
     </p>
 
     <p class="muted">
-      For coexistence, choose the Meta option that connects an existing WhatsApp Business App number.
+      Feature type: <strong>${META_FEATURE_TYPE}</strong>
+    </p>
+
+    <p class="muted">
+      For coexistence, this should connect an existing WhatsApp Business App number.
     </p>
 
     <button onclick="launchWhatsAppSignup()">
@@ -383,7 +419,8 @@ app.get("/whatsapp-connect", requireAdmin, (req, res) => {
           override_default_response_type: true,
           extras: {
             feature: "whatsapp_embedded_signup",
-            sessionInfoVersion: 3
+            sessionInfoVersion: 3,
+            featureType: META_CONFIG.featureType
           }
         }
       );
@@ -410,11 +447,12 @@ app.post("/api/meta/embedded-signup/exchange-code", requireAdmin, async (req, re
     if (!META_APP_ID || !META_APP_SECRET) {
       return res.status(500).json({
         ok: false,
-        error: "META_APP_ID or META_APP_SECRET missing in .env",
+        error: "META_APP_ID or META_APP_SECRET missing in env",
       });
     }
 
-    const tokenResponse = await axios.get(`https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`,
+    const tokenResponse = await axios.get(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`,
       {
         params: {
           client_id: META_APP_ID,
@@ -437,7 +475,7 @@ app.post("/api/meta/embedded-signup/exchange-code", requireAdmin, async (req, re
           {},
           {
             headers: {
-             Authorization: `Bearer ${accessToken}`,
+              Authorization: `Bearer ${accessToken}`,
             },
           }
         );
@@ -502,7 +540,9 @@ app.post("/api/meta/embedded-signup/exchange-code", requireAdmin, async (req, re
   }
 });
 
-
+/**
+ * Privacy Policy URL for Meta App Review.
+ */
 app.get("/privacy-policy", (_req, res) => {
   res.setHeader("Content-Type", "text/html");
 
@@ -511,56 +551,153 @@ app.get("/privacy-policy", (_req, res) => {
     <html>
       <head>
         <meta charset="utf-8" />
-        <title>Privacy Policy - IDC WhatsApp Meta Admin</title>
+        <title>Privacy Policy - Inle Tech WhatsApp Meta Admin</title>
       </head>
       <body style="font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; line-height: 1.6;">
         <h1>Privacy Policy</h1>
 
-        <p><strong>Last updated:</strong> 21 May 2026</p>
+        <p><strong>Last updated:</strong> 27 May 2026</p>
 
         <p>
-          IDC WhatsApp Meta Admin is used by International Dental Centre Pte. Ltd.
-          to connect WhatsApp Business messaging with our internal customer support and appointment enquiry systems.
+          Inle Tech Pte Ltd provides WhatsApp Business API integration, webhook automation,
+          and messaging support services for business clients.
+        </p>
+
+        <p>
+          This application is used to connect customer-owned WhatsApp Business Accounts
+          through Meta Embedded Signup and to support WhatsApp Business messaging workflows.
         </p>
 
         <h2>Information we collect</h2>
         <p>
-          We may process WhatsApp profile information, phone numbers, message content,
-          message status updates, and appointment or dental enquiry details shared by users.
+          We may process Meta Business identifiers, WhatsApp Business Account IDs,
+          phone number IDs, business IDs, webhook subscription status, WhatsApp message events,
+          WhatsApp message status updates, profile names, phone numbers, and message content
+          shared by users with the connected WhatsApp Business number.
         </p>
 
         <h2>How we use information</h2>
         <p>
-          We use this information to respond to dental inquiries, appointment requests,
-          clinic-related questions, and customer support messages.
+          We use this information only to provide WhatsApp Business messaging services,
+          including connecting WhatsApp Business Accounts, receiving webhook events,
+          sending WhatsApp replies, supporting customer communication, dental inquiries,
+          appointment requests, and operational support for our clients.
         </p>
 
         <h2>Data sharing</h2>
         <p>
-          We do not sell user data. Data may be shared only with authorised clinic staff,
-          service providers, or platforms required to operate WhatsApp Business messaging.
+          We do not sell user data. Data may be shared only with authorized client staff,
+          service providers, hosting providers, or platforms required to operate WhatsApp
+          Business messaging and the requested integration.
         </p>
 
         <h2>Data retention</h2>
         <p>
-          We retain message and support records only as needed for clinic operations,
-          compliance, support, and service quality.
+          We retain integration records and message-related records only as needed for
+          service operation, support, compliance, troubleshooting, and service quality.
+        </p>
+
+        <h2>Data deletion</h2>
+        <p>
+          Users or businesses may request deletion by contacting us at admin@inle.tech
+          or by using our data deletion endpoint.
         </p>
 
         <h2>Contact</h2>
         <p>
-          For privacy-related requests, contact us at admin@idcsg.com.
+          For privacy-related requests, contact us at admin@inle.tech.
         </p>
       </body>
     </html>
   `);
 });
 
+/**
+ * Facebook Login deauthorize callback.
+ * Add this URL in Meta:
+ * https://whatsapp-meta-admin.onrender.com/deauthorize
+ */
+app.post("/deauthorize", (req, res) => {
+  console.log("Facebook deauthorize callback:");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  return res.sendStatus(200);
+});
+
+/**
+ * Facebook Data Deletion Request callback.
+ * Add this URL in Meta:
+ * https://whatsapp-meta-admin.onrender.com/data-deletion
+ */
+app.post("/data-deletion", (req, res) => {
+  console.log("Facebook data deletion request:");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  const confirmationCode = `delete_${Date.now()}`;
+
+  return res.json({
+    url: `${PUBLIC_BASE_URL}/data-deletion-status?code=${confirmationCode}`,
+    confirmation_code: confirmationCode,
+  });
+});
+
+app.get("/data-deletion", (_req, res) => {
+  res.setHeader("Content-Type", "text/html");
+
+  res.send(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Data Deletion Request - Inle Tech</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; line-height: 1.6;">
+        <h1>Data Deletion Request</h1>
+        <p>
+          To request deletion of data related to this WhatsApp integration,
+          please email admin@inle.tech with your business name, WhatsApp Business Account ID,
+          and the phone number connected to the service.
+        </p>
+      </body>
+    </html>
+  `);
+});
+
+app.get("/data-deletion-status", (req, res) => {
+  const code = req.query.code || "not provided";
+
+  res.setHeader("Content-Type", "text/html");
+
+  res.send(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Data Deletion Status - Inle Tech</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; line-height: 1.6;">
+        <h1>Data Deletion Request Status</h1>
+
+        <p>
+          Your data deletion request has been received and will be processed.
+        </p>
+
+        <p>
+          Confirmation code: <strong>${String(code)}</strong>
+        </p>
+
+        <p>
+          Contact: admin@inle.tech
+        </p>
+      </body>
+    </html>
+  `);
+});
 
 /**
  * Check saved connection.
  */
-app.get("/api/meta/connection", requireAdmin, (req, res) => {
+app.get("/api/meta/connection", requireAdmin, (_req, res) => {
   const saved = readConnection();
 
   if (!saved) {
@@ -600,7 +737,7 @@ app.get("/webhook", (req, res) => {
 
 /**
  * WhatsApp webhook receiver.
- * Later you can replace this with your existing bot logic.
+ * Later you can replace this with your real bot logic.
  */
 app.post("/webhook", (req, res) => {
   console.log("Incoming WhatsApp webhook:");
@@ -627,8 +764,9 @@ app.post("/api/whatsapp/send-test", requireAdmin, async (req, res) => {
       process.env.PHONE_NUMBER_ID ||
       saved?.phoneNumberId;
 
-    const to = String(req.body.to || "").replace(/\\D/g, "");
-    const body = req.body.body || "Test message from IDC WhatsApp API backend.";
+    const to = String(req.body.to || "").replace(/\D/g, "");
+    const body =
+      req.body.body || "Test message from Inle Tech WhatsApp API backend.";
 
     if (!accessToken) {
       return res.status(400).json({
@@ -651,7 +789,8 @@ app.post("/api/whatsapp/send-test", requireAdmin, async (req, res) => {
       });
     }
 
-    const response = await axios.post(`https://graph.facebook.com/${GRAPH_API_VERSION}/${extracted.wabaId}/subscribed_apps`,
+    const response = await axios.post(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
       {
         messaging_product: "whatsapp",
         to,
